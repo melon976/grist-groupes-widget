@@ -94,6 +94,7 @@
     const select = document.getElementById("groupes");
 
     let recordsById = new Map();
+    let allRowIds = [];
 
     grist.ready({
       requiredAccess: "read table",
@@ -173,6 +174,7 @@
       const previousValue = select.value;
 
       recordsById.clear();
+      allRowIds = [];
 
       select.innerHTML =
         '<option value="">-- Tous --</option>';
@@ -180,8 +182,7 @@
       const rows = [];
 
       for (const record of records) {
-        const mapped =
-          grist.mapColumnNames(record);
+        const mapped = grist.mapColumnNames(record);
 
         if (!mapped) {
           continue;
@@ -197,10 +198,14 @@
           continue;
         }
 
+        const rowId = Number(record.id);
+
         rows.push({
-          id: record.id,
+          id: rowId,
           label: String(value).trim()
         });
+
+        allRowIds.push(rowId);
       }
 
       rows.sort((a, b) =>
@@ -259,22 +264,17 @@
         return;
       }
 
-      const mapped =
-        grist.mapColumnNames(record);
+      const mapped = grist.mapColumnNames(record);
 
       if (!mapped) {
         return;
       }
 
-      const rowId =
-        String(record.id);
+      const rowId = String(record.id);
 
       if (recordsById.has(rowId)) {
         select.value = rowId;
-
-        applyColor(
-          mapped.GROUPE
-        );
+        applyColor(mapped.GROUPE);
       }
     });
 
@@ -282,22 +282,21 @@
       "change",
       async function() {
 
-        const rowId =
-          select.value;
+        const rowId = select.value;
 
         /*
           TOUS :
-          on enlève la sélection utilisée
-          pour filtrer les widgets liés.
+          on sélectionne toutes les lignes
+          de la table GROUPES.
         */
         if (!rowId) {
           applyColor("");
 
           try {
-            await grist.setSelectedRows(null);
+            await grist.setSelectedRows(allRowIds);
           } catch (error) {
             console.error(
-              "Erreur lors du retour à toutes les lignes :",
+              "Erreur lors de la sélection de tous les groupes :",
               error
             );
           }
@@ -305,8 +304,7 @@
           return;
         }
 
-        const row =
-          recordsById.get(rowId);
+        const row = recordsById.get(rowId);
 
         if (!row) {
           return;
@@ -316,19 +314,13 @@
 
         try {
           /*
-            On indique à Grist que cette ligne
-            est la sélection utilisée pour filtrer
-            les widgets liés.
+            Un groupe :
+            on sélectionne uniquement sa ligne.
           */
           await grist.setSelectedRows([
             Number(rowId)
           ]);
 
-          /*
-            On déplace également le curseur sur
-            la ligne choisie pour garder la sélection
-            cohérente dans Grist.
-          */
           await grist.setCursorPos({
             rowId: Number(rowId)
           });
