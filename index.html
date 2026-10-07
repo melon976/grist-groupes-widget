@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Groupes Grist</title>
+  <title>Sélecteur de groupe</title>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
@@ -13,51 +13,43 @@
       box-sizing: border-box;
     }
 
-    body {
+    html, body {
       margin: 0;
-      padding: 16px;
+      padding: 0;
+      background: transparent;
       font-family: Arial, sans-serif;
-      background: #f7f8fa;
     }
 
-    .widget {
-      max-width: 500px;
-      margin: 0 auto;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 14px;
-      font-weight: bold;
-      color: #333;
+    body {
+      padding: 4px;
     }
 
     select {
       width: 100%;
-      padding: 12px 14px;
-      font-size: 16px;
-      font-weight: bold;
-      border: 2px solid #d0d5dd;
-      border-radius: 10px;
+      height: 38px;
+
+      padding: 0 12px;
+
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+
+      font-size: 15px;
+      font-weight: 700;
+
       cursor: pointer;
       outline: none;
+
       background-color: white;
+      color: #334155;
     }
 
     select:focus {
       border-color: #4f46e5;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.12);
     }
 
     option {
-      font-weight: bold;
-      padding: 8px;
-    }
-
-    .info {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #667085;
+      font-weight: 700;
     }
 
     /* BAC PRO */
@@ -92,63 +84,46 @@
 
     /* Autres */
     .autre {
-      background-color: #f3f4f6;
-      color: #374151;
+      background-color: #f1f5f9;
+      color: #334155;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="widget">
-
-    <label for="groupes">GROUPE</label>
-
-    <select id="groupes">
-      <option value="">-- Sélectionner un groupe --</option>
-    </select>
-
-    <div class="info" id="info">
-      Sélectionne une table et une colonne dans la configuration du widget.
-    </div>
-
-  </div>
+  <select id="groupes">
+    <option value="">-- Tous / sélectionner un groupe --</option>
+  </select>
 
   <script>
 
     const select = document.getElementById("groupes");
-    const info = document.getElementById("info");
 
-    let currentRecord = null;
-    let currentMappings = null;
-    let allRecords = [];
+    let recordsById = new Map();
 
 
     /*
-      Grist affichera un sélecteur de colonne
-      dans la configuration du widget.
+      Le widget :
+      - lit une table choisie dans Grist
+      - permet de mapper une colonne
+      - peut servir de source de liaison
     */
 
     grist.ready({
-      requiredAccess: "full",
+      requiredAccess: "read table",
+      allowSelectBy: true,
 
       columns: [
         {
           name: "GROUPE",
           title: "Colonne des groupes",
           type: "Any",
-          optional: false,
-          allowMultiple: false,
-          description: "Choisis la colonne contenant les noms des groupes"
+          optional: false
         }
       ]
     });
 
-
-    /*
-      Détermine la catégorie d'un groupe
-      à partir de son nom.
-    */
 
     function getCategory(value) {
 
@@ -156,7 +131,9 @@
         return "autre";
       }
 
-      const text = String(value).trim().toUpperCase();
+      const text = String(value)
+        .trim()
+        .toUpperCase();
 
       if (text.startsWith("BAC PRO")) {
         return "bacpro";
@@ -188,11 +165,7 @@
     }
 
 
-    /*
-      Applique la couleur au select fermé.
-    */
-
-    function applySelectColor(value) {
+    function applyColor(value) {
 
       select.classList.remove(
         "bacpro",
@@ -205,32 +178,35 @@
 
       if (!value) {
         select.style.backgroundColor = "white";
-        select.style.color = "#333";
+        select.style.color = "#334155";
         return;
       }
 
-      const category = getCategory(value);
+      select.style.backgroundColor = "";
+      select.style.color = "";
 
-      select.classList.add(category);
+      select.classList.add(
+        getCategory(value)
+      );
     }
 
 
-    /*
-      Reconstruit la liste déroulante
-      à partir des valeurs présentes
-      dans la colonne choisie.
-    */
-
     function buildMenu(records) {
 
-      select.innerHTML =
-        '<option value="">-- Sélectionner un groupe --</option>';
+      const currentValue = select.value;
 
-      const values = new Set();
+      recordsById.clear();
+
+      select.innerHTML =
+        '<option value="">-- Tous / sélectionner un groupe --</option>';
+
+
+      const rows = [];
 
       records.forEach(record => {
 
-        const mapped = grist.mapColumnNames(record);
+        const mapped =
+          grist.mapColumnNames(record);
 
         if (!mapped) {
           return;
@@ -239,34 +215,50 @@
         const value = mapped.GROUPE;
 
         if (
-          value !== null &&
-          value !== undefined &&
-          String(value).trim() !== ""
+          value === null ||
+          value === undefined ||
+          String(value).trim() === ""
         ) {
-          values.add(String(value).trim());
+          return;
         }
+
+        rows.push({
+          id: record.id,
+          label: String(value).trim()
+        });
 
       });
 
 
-      const sortedValues = Array
-        .from(values)
-        .sort((a, b) =>
-          a.localeCompare(b, "fr", {
+      rows.sort((a, b) =>
+        a.label.localeCompare(
+          b.label,
+          "fr",
+          {
             sensitivity: "base"
-          })
+          }
+        )
+      );
+
+
+      rows.forEach(row => {
+
+        recordsById.set(
+          String(row.id),
+          row
         );
 
+        const option =
+          document.createElement("option");
 
-      sortedValues.forEach(value => {
+        option.value =
+          String(row.id);
 
-        const option = document.createElement("option");
-
-        option.value = value;
-        option.textContent = value;
+        option.textContent =
+          row.label;
 
         option.classList.add(
-          getCategory(value)
+          getCategory(row.label)
         );
 
         select.appendChild(option);
@@ -274,136 +266,118 @@
       });
 
 
-      info.textContent =
-        sortedValues.length +
-        " ligne(s) trouvé(s) dans la colonne sélectionnée.";
+      if (
+        currentValue &&
+        recordsById.has(currentValue)
+      ) {
+        select.value = currentValue;
+
+        applyColor(
+          recordsById.get(currentValue).label
+        );
+      }
 
     }
 
 
     /*
-      Appelé quand les données de la table changent.
-      Donc si tu ajoutes un groupe dans Grist,
-      le menu se met à jour automatiquement.
+      Récupère toutes les lignes de la table
+      choisie pour ce widget.
     */
 
-    grist.onRecords(function(records, mappings) {
+    grist.onRecords(function(records) {
 
-      currentMappings = mappings;
-
-      allRecords = records || [];
-
-      buildMenu(allRecords);
+      buildMenu(records || []);
 
     });
 
 
     /*
-      Appelé lorsqu'on change de ligne
-      dans Grist.
+      Si Grist déplace lui-même le curseur
+      dans la table des groupes,
+      le menu suit la sélection.
     */
 
-    grist.onRecord(function(record, mappings) {
-
-      currentRecord = record;
-      currentMappings = mappings;
+    grist.onRecord(function(record) {
 
       if (!record) {
-        select.value = "";
-        applySelectColor("");
         return;
       }
 
-      const mapped = grist.mapColumnNames(record);
+      const mapped =
+        grist.mapColumnNames(record);
 
       if (!mapped) {
-
-        select.value = "";
-        applySelectColor("");
-
-        info.textContent =
-          "Choisis une colonne dans la configuration du widget.";
-
         return;
       }
 
-      const value =
-        mapped.GROUPE === null ||
-        mapped.GROUPE === undefined
-          ? ""
-          : String(mapped.GROUPE);
+      const rowId =
+        String(record.id);
 
-      select.value = value;
+      if (recordsById.has(rowId)) {
 
-      applySelectColor(value);
+        select.value = rowId;
+
+        applyColor(
+          mapped.GROUPE
+        );
+
+      }
 
     });
 
 
     /*
-      Quand on choisit un groupe,
-      on modifie la ligne sélectionnée dans Grist.
+      Quand on choisit un groupe :
+      on déplace simplement la sélection Grist
+      vers la ligne correspondante.
+
+      AUCUNE donnée n'est modifiée.
     */
 
-    select.addEventListener("change", async function() {
+    select.addEventListener(
+      "change",
+      async function() {
 
-      const value = select.value;
+        const rowId =
+          select.value;
 
-      applySelectColor(value);
+        if (!rowId) {
 
-      if (!currentRecord || !currentRecord.id) {
-        return;
-      }
+          applyColor("");
 
-      try {
-
-        /*
-          On crée d'abord un objet utilisant
-          le nom logique "GROUPE".
-        */
-
-        const mappedRecord = {
-          id: currentRecord.id,
-          GROUPE: value
-        };
+          return;
+        }
 
 
-        /*
-          Grist reconvertit ensuite "GROUPE"
-          vers le vrai nom de colonne choisi
-          dans le panneau du widget.
-        */
+        const row =
+          recordsById.get(rowId);
 
-        const originalRecord =
-          grist.mapColumnNamesBack(
-            mappedRecord,
-            {
-              mappings: currentMappings
-            }
+        if (!row) {
+          return;
+        }
+
+
+        applyColor(row.label);
+
+
+        try {
+
+          await grist.setCursorPos({
+            rowId: Number(rowId)
+          });
+
+        } catch (error) {
+
+          console.error(
+            "Erreur de sélection :",
+            error
           );
 
-
-        await grist.selectedTable.update({
-          id: currentRecord.id,
-          fields: {
-            [currentMappings.GROUPE]: value
-          }
-        });
-
-
-      } catch (error) {
-
-        console.error(
-          "Erreur lors de la mise à jour :",
-          error
-        );
-
-        info.textContent =
-          "Erreur lors de la mise à jour de Grist.";
+        }
 
       }
-
-    });
+    );
 
   </script>
 
