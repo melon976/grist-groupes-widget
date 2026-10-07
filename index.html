@@ -40,9 +40,9 @@
       font-weight: bold;
       border: 2px solid #d0d5dd;
       border-radius: 10px;
-      background: white;
       cursor: pointer;
       outline: none;
+      background-color: white;
     }
 
     select:focus {
@@ -54,35 +54,46 @@
       padding: 8px;
     }
 
+    .info {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #667085;
+    }
+
+    /* BAC PRO */
     .bacpro {
       background-color: #dbeafe;
       color: #1e3a8a;
     }
 
+    /* BTS / BTSA */
     .bts {
       background-color: #ede9fe;
       color: #5b21b6;
     }
 
+    /* CAP / CAPa */
     .cap {
       background-color: #dcfce7;
       color: #166534;
     }
 
+    /* CS */
     .cs {
       background-color: #ffedd5;
       color: #9a3412;
     }
 
+    /* Licence */
     .licence {
       background-color: #fee2e2;
       color: #991b1b;
     }
 
-    .info {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #667085;
+    /* Autres */
+    .autre {
+      background-color: #f3f4f6;
+      color: #374151;
     }
   </style>
 </head>
@@ -95,50 +106,10 @@
 
     <select id="groupes">
       <option value="">-- Sélectionner un groupe --</option>
-
-      <optgroup label="BAC PRO">
-        <option class="bacpro">BAC PRO AP 1ERE B</option>
-        <option class="bacpro">BAC PRO AP 2NDE</option>
-        <option class="bacpro">BAC PRO AP TERM</option>
-        <option class="bacpro">BAC PRO CGEA 1ERE</option>
-        <option class="bacpro">BAC PRO CGEA 2NDE</option>
-        <option class="bacpro">BAC PRO CGEA TERM</option>
-        <option class="bacpro">BAC PRO MM 1ERE</option>
-        <option class="bacpro">BAC PRO MM 2NDE</option>
-        <option class="bacpro">BAC PRO MM TERM</option>
-      </optgroup>
-
-      <optgroup label="BTS / BTSA">
-        <option class="bts">BTS TSMA1</option>
-        <option class="bts">BTS TSMA2</option>
-        <option class="bts">BTSA ACS'AGRI 1</option>
-        <option class="bts">BTSA ACS'AGRI 2</option>
-        <option class="bts">BTSA AP1</option>
-        <option class="bts">BTSA AP2</option>
-      </optgroup>
-
-      <optgroup label="CAP / CAPa">
-        <option class="cap">CAP FLEURISTE 1</option>
-        <option class="cap">CAP MM 1</option>
-        <option class="cap">CAP MM 2</option>
-        <option class="cap">CAPa JP1</option>
-        <option class="cap">CAPa JP2</option>
-        <option class="cap">CAPa MA1</option>
-        <option class="cap">CAPa MA2</option>
-      </optgroup>
-
-      <optgroup label="CS">
-        <option class="cs">CS CONSTRUCTION PAYSAGERE</option>
-      </optgroup>
-
-      <optgroup label="LICENCE PRO">
-        <option class="licence">LICENCE PRO PAYSAGE 1AN</option>
-      </optgroup>
-
     </select>
 
-    <div class="info">
-      Le groupe sélectionné sera lié à la colonne GROUPES dans Grist.
+    <div class="info" id="info">
+      Sélectionne une table et une colonne dans la configuration du widget.
     </div>
 
   </div>
@@ -146,35 +117,239 @@
   <script>
 
     const select = document.getElementById("groupes");
+    const info = document.getElementById("info");
 
     let currentRecord = null;
+    let currentMappings = null;
+    let allRecords = [];
+
+
+    /*
+      Grist affichera un sélecteur de colonne
+      dans la configuration du widget.
+    */
 
     grist.ready({
       requiredAccess: "full",
+
       columns: [
         {
-          name: "GROUPES",
-          title: "Colonne GROUPES",
-          type: "Text"
+          name: "GROUPE",
+          title: "Colonne des groupes",
+          type: "Any",
+          optional: false,
+          allowMultiple: false,
+          description: "Choisis la colonne contenant les noms des groupes"
         }
       ]
     });
 
-    grist.onRecord(function(record) {
 
-      currentRecord = record;
+    /*
+      Détermine la catégorie d'un groupe
+      à partir de son nom.
+    */
 
-      const mapped = grist.mapColumnNames(record);
+    function getCategory(value) {
 
-      if (mapped && mapped.GROUPES) {
-        select.value = mapped.GROUPES;
-      } else {
-        select.value = "";
+      if (!value) {
+        return "autre";
       }
+
+      const text = String(value).trim().toUpperCase();
+
+      if (text.startsWith("BAC PRO")) {
+        return "bacpro";
+      }
+
+      if (
+        text.startsWith("BTS ") ||
+        text.startsWith("BTSA ")
+      ) {
+        return "bts";
+      }
+
+      if (
+        text.startsWith("CAP ") ||
+        text.startsWith("CAPA ")
+      ) {
+        return "cap";
+      }
+
+      if (text.startsWith("CS ")) {
+        return "cs";
+      }
+
+      if (text.startsWith("LICENCE")) {
+        return "licence";
+      }
+
+      return "autre";
+    }
+
+
+    /*
+      Applique la couleur au select fermé.
+    */
+
+    function applySelectColor(value) {
+
+      select.classList.remove(
+        "bacpro",
+        "bts",
+        "cap",
+        "cs",
+        "licence",
+        "autre"
+      );
+
+      if (!value) {
+        select.style.backgroundColor = "white";
+        select.style.color = "#333";
+        return;
+      }
+
+      const category = getCategory(value);
+
+      select.classList.add(category);
+    }
+
+
+    /*
+      Reconstruit la liste déroulante
+      à partir des valeurs présentes
+      dans la colonne choisie.
+    */
+
+    function buildMenu(records) {
+
+      select.innerHTML =
+        '<option value="">-- Sélectionner un groupe --</option>';
+
+      const values = new Set();
+
+      records.forEach(record => {
+
+        const mapped = grist.mapColumnNames(record);
+
+        if (!mapped) {
+          return;
+        }
+
+        const value = mapped.GROUPE;
+
+        if (
+          value !== null &&
+          value !== undefined &&
+          String(value).trim() !== ""
+        ) {
+          values.add(String(value).trim());
+        }
+
+      });
+
+
+      const sortedValues = Array
+        .from(values)
+        .sort((a, b) =>
+          a.localeCompare(b, "fr", {
+            sensitivity: "base"
+          })
+        );
+
+
+      sortedValues.forEach(value => {
+
+        const option = document.createElement("option");
+
+        option.value = value;
+        option.textContent = value;
+
+        option.classList.add(
+          getCategory(value)
+        );
+
+        select.appendChild(option);
+
+      });
+
+
+      info.textContent =
+        sortedValues.length +
+        " ligne(s) trouvé(s) dans la colonne sélectionnée.";
+
+    }
+
+
+    /*
+      Appelé quand les données de la table changent.
+      Donc si tu ajoutes un groupe dans Grist,
+      le menu se met à jour automatiquement.
+    */
+
+    grist.onRecords(function(records, mappings) {
+
+      currentMappings = mappings;
+
+      allRecords = records || [];
+
+      buildMenu(allRecords);
 
     });
 
+
+    /*
+      Appelé lorsqu'on change de ligne
+      dans Grist.
+    */
+
+    grist.onRecord(function(record, mappings) {
+
+      currentRecord = record;
+      currentMappings = mappings;
+
+      if (!record) {
+        select.value = "";
+        applySelectColor("");
+        return;
+      }
+
+      const mapped = grist.mapColumnNames(record);
+
+      if (!mapped) {
+
+        select.value = "";
+        applySelectColor("");
+
+        info.textContent =
+          "Choisis une colonne dans la configuration du widget.";
+
+        return;
+      }
+
+      const value =
+        mapped.GROUPE === null ||
+        mapped.GROUPE === undefined
+          ? ""
+          : String(mapped.GROUPE);
+
+      select.value = value;
+
+      applySelectColor(value);
+
+    });
+
+
+    /*
+      Quand on choisit un groupe,
+      on modifie la ligne sélectionnée dans Grist.
+    */
+
     select.addEventListener("change", async function() {
+
+      const value = select.value;
+
+      applySelectColor(value);
 
       if (!currentRecord || !currentRecord.id) {
         return;
@@ -182,15 +357,50 @@
 
       try {
 
+        /*
+          On crée d'abord un objet utilisant
+          le nom logique "GROUPE".
+        */
+
+        const mappedRecord = {
+          id: currentRecord.id,
+          GROUPE: value
+        };
+
+
+        /*
+          Grist reconvertit ensuite "GROUPE"
+          vers le vrai nom de colonne choisi
+          dans le panneau du widget.
+        */
+
+        const originalRecord =
+          grist.mapColumnNamesBack(
+            mappedRecord,
+            {
+              mappings: currentMappings
+            }
+          );
+
+
         await grist.selectedTable.update({
           id: currentRecord.id,
           fields: {
-            GROUPES: select.value
+            [currentMappings.GROUPE]: value
           }
         });
 
+
       } catch (error) {
-        console.error("Erreur lors de la mise à jour :", error);
+
+        console.error(
+          "Erreur lors de la mise à jour :",
+          error
+        );
+
+        info.textContent =
+          "Erreur lors de la mise à jour de Grist.";
+
       }
 
     });
