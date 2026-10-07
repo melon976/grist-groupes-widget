@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Groupes Grist</title>
+
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+    }
+
+    .widget {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: bold;
+      border: 2px solid #d0d5dd;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: #4f46e5;
+    }
+
+    option {
+      font-weight: bold;
+      padding: 8px;
+    }
+
+    .bacpro {
+      background-color: #dbeafe;
+      color: #1e3a8a;
+    }
+
+    .bts {
+      background-color: #ede9fe;
+      color: #5b21b6;
+    }
+
+    .cap {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .cs {
+      background-color: #ffedd5;
+      color: #9a3412;
+    }
+
+    .licence {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .info {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #667085;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="widget">
+
+    <label for="groupes">GROUPE</label>
+
+    <select id="groupes">
+      <option value="">-- Sélectionner un groupe --</option>
+
+      <optgroup label="BAC PRO">
+        <option class="bacpro">BAC PRO AP 1ERE B</option>
+        <option class="bacpro">BAC PRO AP 2NDE</option>
+        <option class="bacpro">BAC PRO AP TERM</option>
+        <option class="bacpro">BAC PRO CGEA 1ERE</option>
+        <option class="bacpro">BAC PRO CGEA 2NDE</option>
+        <option class="bacpro">BAC PRO CGEA TERM</option>
+        <option class="bacpro">BAC PRO MM 1ERE</option>
+        <option class="bacpro">BAC PRO MM 2NDE</option>
+        <option class="bacpro">BAC PRO MM TERM</option>
+      </optgroup>
+
+      <optgroup label="BTS / BTSA">
+        <option class="bts">BTS TSMA1</option>
+        <option class="bts">BTS TSMA2</option>
+        <option class="bts">BTSA ACS'AGRI 1</option>
+        <option class="bts">BTSA ACS'AGRI 2</option>
+        <option class="bts">BTSA AP1</option>
+        <option class="bts">BTSA AP2</option>
+      </optgroup>
+
+      <optgroup label="CAP / CAPa">
+        <option class="cap">CAP FLEURISTE 1</option>
+        <option class="cap">CAP MM 1</option>
+        <option class="cap">CAP MM 2</option>
+        <option class="cap">CAPa JP1</option>
+        <option class="cap">CAPa JP2</option>
+        <option class="cap">CAPa MA1</option>
+        <option class="cap">CAPa MA2</option>
+      </optgroup>
+
+      <optgroup label="CS">
+        <option class="cs">CS CONSTRUCTION PAYSAGERE</option>
+      </optgroup>
+
+      <optgroup label="LICENCE PRO">
+        <option class="licence">LICENCE PRO PAYSAGE 1AN</option>
+      </optgroup>
+
+    </select>
+
+    <div class="info">
+      Le groupe sélectionné sera lié à la colonne GROUPES dans Grist.
+    </div>
+
+  </div>
+
+  <script>
+
+    const select = document.getElementById("groupes");
+
+    let currentRecord = null;
+
+    grist.ready({
+      requiredAccess: "full",
+      columns: [
+        {
+          name: "GROUPES",
+          title: "Colonne GROUPES",
+          type: "Text"
+        }
+      ]
+    });
+
+    grist.onRecord(function(record) {
+
+      currentRecord = record;
+
+      const mapped = grist.mapColumnNames(record);
+
+      if (mapped && mapped.GROUPES) {
+        select.value = mapped.GROUPES;
+      } else {
+        select.value = "";
+      }
+
+    });
+
+    select.addEventListener("change", async function() {
+
+      if (!currentRecord || !currentRecord.id) {
+        return;
+      }
+
+      try {
+
+        await grist.selectedTable.update({
+          id: currentRecord.id,
+          fields: {
+            GROUPES: select.value
+          }
+        });
+
+      } catch (error) {
+        console.error("Erreur lors de la mise à jour :", error);
+      }
+
+    });
+
+  </script>
+
+</body>
+</html>
